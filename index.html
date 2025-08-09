@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Greek Alphabet Trainer</title>
+
+  <!-- PWA bits -->
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#0f172a" />
   <script>
@@ -13,9 +15,660 @@
       });
     }
   </script>
-  <!-- The rest of the HTML/CSS/JS would be from the previous greek-alphabet-trainer.html content -->
-  <p>Placeholder - you would paste the full app HTML content here.</p>
+
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #0b1220;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #38bdf8;
+      --good: #22c55e;
+      --bad: #ef4444;
+      --warn: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
+      background: radial-gradient(1200px 600px at 100% -10%, #10203a, #0a1020 60%, #070b16 100%), var(--bg);
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      position: sticky;
+      top: 0;
+      backdrop-filter: blur(8px);
+      background: linear-gradient(180deg, rgba(10,16,32,.8), rgba(10,16,32,.4));
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      z-index: 10;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: .5px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .badge {
+      font-size: 12px;
+      color: var(--bg);
+      background: var(--accent);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    nav {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    nav button {
+      background: #0b1220;
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    nav button.active {
+      background: #13223c;
+      border-color: rgba(56,189,248,.6);
+      box-shadow: 0 0 0 2px rgba(56,189,248,.2) inset;
+    }
+
+    main {
+      padding: 20px;
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(17,24,39,.8), rgba(17,24,39,.6));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .spacer { flex: 1; }
+
+    .card {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      align-items: center;
+      text-align: center;
+    }
+
+    .glyph {
+      font-size: clamp(96px, 14vw, 160px);
+      line-height: 1;
+      margin: 0;
+      font-weight: 700;
+    }
+    .subglyph {
+      font-size: clamp(48px, 10vw, 80px);
+      color: var(--muted);
+      line-height: 1;
+      margin: 0;
+    }
+    .name {
+      font-size: 28px;
+      margin: 0;
+    }
+    .pron {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0;
+    }
+    .usage {
+      color: var(--muted);
+      font-size: 13px;
+      margin: 0;
+    }
+
+    .controls button, .controls select, .controls input[type="text"] {
+      background: #0b1220;
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+    }
+    .controls button.primary {
+      border-color: rgba(56,189,248,.6);
+    }
+    .controls button.good { border-color: rgba(34,197,94,.6); }
+    .controls button.warn { border-color: rgba(245,158,11,.6); }
+    .controls button.bad { border-color: rgba(239,68,68,.6); }
+    .controls .tiny { padding: 6px 8px; font-size: 12px; }
+
+    .letters {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 8px;
+    }
+    .pill {
+      padding: 8px 10px;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,.1);
+      background: #0b1220;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+    .pill.learned { outline: 2px solid rgba(34,197,94,.6); }
+
+    /* Trace canvas */
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #0b1220;
+      border: 1px dashed rgba(255,255,255,.1);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    canvas { width: 100%; height: 100%; display: block; }
+    .ghost-letter {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: rgba(255,255,255,.07);
+      font-size: min(65vw, 65vh);
+      user-select: none;
+      pointer-events: none;
+      font-weight: 800;
+    }
+
+    .quiz-q {
+      font-size: 22px;
+      margin: 8px 0 4px 0;
+    }
+    .quiz-options {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .quiz-options button {
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.1);
+      background: #0b1220;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .quiz-options button.correct { outline: 3px solid rgba(34,197,94,.7); }
+    .quiz-options button.incorrect { outline: 3px solid rgba(239,68,68,.7); }
+
+    .stat {
+      font-feature-settings: "tnum";
+      font-variant-numeric: tabular-nums;
+      background: #0b1220;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px;
+      padding: 8px 10px;
+    }
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      padding: 30px 10px;
+      font-size: 12px;
+    }
+    a { color: var(--accent); }
+  </style>
 </head>
 <body>
+  <header>
+    <h1>Greek Alphabet Trainer <span class="badge">PWA</span></h1>
+    <nav>
+      <button class="tab-btn active" data-tab="learn">Learn</button>
+      <button class="tab-btn" data-tab="trace">Trace</button>
+      <button class="tab-btn" data-tab="quiz">Quiz</button>
+      <button class="tab-btn" data-tab="progress">Progress</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Learn -->
+    <section id="learn" class="panel">
+      <div class="row controls">
+        <button id="prevLetter" class="tiny">◀ Prev</button>
+        <button id="nextLetter" class="tiny">Next ▶</button>
+        <div class="spacer"></div>
+        <label>
+          Voice:
+          <select id="voiceSelect"></select>
+        </label>
+        <button id="speakBtn" class="primary">🔊 Pronounce</button>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div>
+            <p id="glyphUpper" class="glyph">Α</p>
+            <p id="glyphLower" class="subglyph">α</p>
+          </div>
+          <div>
+            <p id="name" class="name">alpha</p>
+            <p id="pron" class="pron">AL-fuh (US math)</p>
+            <p id="usage" class="usage">Common in angles; α often denotes an angle.</p>
+          </div>
+          <div class="row controls" style="justify-content:center;">
+            <button id="markLearned" class="good">Mark learned ✓</button>
+            <button id="resetLearned" class="warn">Unmark</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 style="margin-top:0;">All letters</h3>
+          <div id="lettersList" class="letters"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trace -->
+    <section id="trace" class="panel" hidden>
+      <div class="row controls">
+        <label>Letter:
+          <select id="traceSelect"></select>
+        </label>
+        <label>Case:
+          <select id="traceCase">
+            <option value="upper">Uppercase</option>
+            <option value="lower">Lowercase</option>
+          </select>
+        </label>
+        <div class="spacer"></div>
+        <button id="erase" class="bad">Clear</button>
+        <button id="savePNG" class="primary">Save as PNG</button>
+      </div>
+      <div class="canvas-wrap">
+        <div id="ghost" class="ghost-letter">Α</div>
+        <canvas id="pad" width="900" height="900"></canvas>
+      </div>
+      <p class="pron" style="margin-top:8px;">
+        Tip: Trace along the faint letter. Use a slow, steady stroke. Click <b>Save as PNG</b> to export your tracing.
+      </p>
+    </section>
+
+    <!-- Quiz -->
+    <section id="quiz" class="panel" hidden>
+      <div class="row controls">
+        <label>Mode:
+          <select id="quizMode">
+            <option value="see-name">See a letter → pick its name</option>
+            <option value="hear-letter">Hear the name → pick the letter</option>
+            <option value="type-name">See a letter → type its name</option>
+          </select>
+        </label>
+        <label>Scope:
+          <select id="quizScope">
+            <option value="all">All letters</option>
+            <option value="unlearned">Only unlearned</option>
+            <option value="learned">Only learned</option>
+          </select>
+        </label>
+        <div class="spacer"></div>
+        <span class="stat">Score: <span id="score">0</span>/<span id="total">0</span></span>
+        <button id="newQ" class="primary">New Question</button>
+      </div>
+      <div id="quizBody" class="panel" style="min-height:180px;">
+        <div id="qText" class="quiz-q">Press "New Question" to start.</div>
+        <div id="quizOptions" class="quiz-options"></div>
+        <div id="quizFree" class="row" style="margin-top:8px;"></div>
+      </div>
+    </section>
+
+    <!-- Progress -->
+    <section id="progress" class="panel" hidden>
+      <h3 style="margin-top:0;">Your progress</h3>
+      <div class="letters" id="progressList"></div>
+      <div class="row" style="margin-top:12px;">
+        <div class="spacer"></div>
+        <button id="resetAll" class="bad">Reset progress</button>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Built for learning the Greek alphabet with US‑style math pronunciations. Uses your browser's speech engine for audio (Settings → Voice). Install via “Add to Home Screen” for a full-screen app.
+  </footer>
+
+  <script>
+    // --- DATA -------------------------------------------------------
+    const LETTERS = [
+      {u:'Α', l:'α', name:'alpha', pron:'AL-fuh', usage:'Angle; learning rate; significance level α.', alt:['AL-fa']},
+      {u:'Β', l:'β', name:'beta', pron:'BAY-tuh', usage:'Beta coefficient; second item.', alt:['BEE-tuh']},
+      {u:'Γ', l:'γ', name:'gamma', pron:'GAM-uh', usage:'Gamma function Γ; Euler–Mascheroni γ.'},
+      {u:'Δ', l:'δ', name:'delta', pron:'DEL-tuh', usage:'Change (Δx); small change δ.'},
+      {u:'Ε', l:'ε', name:'epsilon', pron:'EP-sih-lon', usage:'A small positive number ε.'},
+      {u:'Ζ', l:'ζ', name:'zeta', pron:'ZAY-tuh', usage:'Riemann zeta ζ(s).'},
+      {u:'Η', l:'η', name:'eta', pron:'AY-tuh', usage:'Efficiency η; viscosity.'},
+      {u:'Θ', l:'θ', name:'theta', pron:'THAY-tuh', usage:'Angle θ; step size.'},
+      {u:'Ι', l:'ι', name:'iota', pron:'eye-OH-tuh', usage:'A tiny amount (not one iota).'},
+      {u:'Κ', l:'κ', name:'kappa', pron:'KAP-uh', usage:'Curvature κ; kappa statistic.'},
+      {u:'Λ', l:'λ', name:'lambda', pron:'LAM-duh', usage:'Eigenvalues λ; wavelength.'},
+      {u:'Μ', l:'μ', name:'mu', pron:'MYOO', usage:'Mean μ; coefficient of friction.'},
+      {u:'Ν', l:'ν', name:'nu', pron:'NOO', usage:'Frequency ν; degrees of freedom.'},
+      {u:'Ξ', l:'ξ', name:'xi', pron:'ZAI (or ksee)', usage:'Random variable ξ; Greek letter Xi.', alt:['ksee']},
+      {u:'Ο', l:'ο', name:'omicron', pron:'OM-ih-kron', usage:'Rare in math; the letter Ο/ο.'},
+      {u:'Π', l:'π', name:'pi', pron:'PIE', usage:'Circle constant π ≈ 3.14159.'},
+      {u:'Ρ', l:'ρ', name:'rho', pron:'ROH', usage:'Density ρ; correlation coefficient.'},
+      {u:'Σ', l:'σ', name:'sigma', pron:'SIG-muh', usage:'Sum Σ; standard deviation σ; final σ = ς.'},
+      {u:'Τ', l:'τ', name:'tau', pron:'TOW (as in cow)', usage:'Time constant τ; sometimes 2π.'},
+      {u:'Υ', l:'υ', name:'upsilon', pron:'OOP-sih-lon', usage:'Rare in math; particle Υ (upsilon).'},
+      {u:'Φ', l:'φ', name:'phi', pron:'FIE (or fee)', usage:'Golden ratio φ; polar angle.', alt:['fee']},
+      {u:'Χ', l:'χ', name:'chi', pron:'KAI (rhymes with pie)', usage:'Chi‑square χ²; characteristic function.'},
+      {u:'Ψ', l:'ψ', name:'psi', pron:'SAI (or psai)', usage:'Wavefunction ψ; psychology symbol.'},
+      {u:'Ω', l:'ω', name:'omega', pron:'oh-MAY-guh', usage:'Angular frequency ω; big‑Ω notation.'},
+    ];
+
+    const STORAGE_KEY = "greek_trainer_progress_v1";
+
+    // --- UTIL -------------------------------------------------------
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+    function loadProgress() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : { learned: {} , score:{right:0,total:0} };
+      } catch(e) {
+        return { learned: {}, score:{right:0,total:0} };
+      }
+    }
+    function saveProgress(p) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+      renderProgress();
+      renderLettersList();
+    }
+    let PROG = loadProgress();
+
+    // --- TABS -------------------------------------------------------
+    $$(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        $$(".tab-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const tab = btn.dataset.tab;
+        ["learn","trace","quiz","progress"].forEach(id => {
+          const sec = document.getElementById(id);
+          sec.hidden = id !== tab;
+        });
+      });
+    });
+
+    // --- LEARN VIEW -------------------------------------------------
+    let idx = 0;
+    function renderLearn() {
+      const L = LETTERS[idx];
+      $("#glyphUpper").textContent = L.u;
+      $("#glyphLower").textContent = L.l;
+      $("#name").textContent = L.name;
+      $("#pron").textContent = `${L.pron}${L.alt ? " • aka " + L.alt.join(", ") : ""}`;
+      $("#usage").textContent = L.usage;
+      $("#markLearned").disabled = !!PROG.learned[L.name];
+      $("#resetLearned").disabled = !PROG.learned[L.name];
+      highlightGhost();
+      // Select in trace dropdown too
+      $("#traceSelect").value = L.name;
+      document.dispatchEvent(new CustomEvent("traceChange"));
+      // Scroll letters list into view
+      const pill = document.querySelector(`.pill[data-name="${L.name}"]`);
+      if (pill) pill.scrollIntoView({block:"center", behavior:"smooth"});
+    }
+    $("#prevLetter").addEventListener("click", () => { idx = (idx - 1 + LETTERS.length) % LETTERS.length; renderLearn(); });
+    $("#nextLetter").addEventListener("click", () => { idx = (idx + 1) % LETTERS.length; renderLearn(); });
+
+    function renderLettersList() {
+      const wrap = $("#lettersList");
+      wrap.innerHTML = "";
+      LETTERS.forEach((L,i) => {
+        const div = document.createElement("button");
+        div.className = "pill" + (PROG.learned[L.name] ? " learned" : "");
+        div.dataset.name = L.name;
+        div.innerHTML = `<div style="font-size:28px; line-height:1">${L.u}</div><div style="color:var(--muted); font-size:12px">${L.l}</div><div style="font-size:12px; margin-top:2px">${L.name}</div>`;
+        div.addEventListener("click", () => { idx = i; renderLearn(); });
+        wrap.appendChild(div);
+      });
+    }
+
+    $("#markLearned").addEventListener("click", () => {
+      PROG.learned[LETTERS[idx].name] = true;
+      saveProgress(PROG);
+      renderLearn();
+    });
+    $("#resetLearned").addEventListener("click", () => {
+      delete PROG.learned[LETTERS[idx].name];
+      saveProgress(PROG);
+      renderLearn();
+    });
+
+    // --- SPEECH -----------------------------------------------------
+    const voiceSel = $("#voiceSelect");
+    let voices = [];
+    function loadVoices() {
+      voices = speechSynthesis.getVoices().filter(v => v.lang.startsWith("en"));
+      voiceSel.innerHTML = voices.map((v,i) => `<option value="${i}">${v.name} — ${v.lang}${v.default?" (default)":""}</option>`).join("");
+    }
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    function speak(text) {
+      const u = new SpeechSynthesisUtterance(text);
+      const idx = +voiceSel.value;
+      if (voices[idx]) u.voice = voices[idx];
+      u.rate = 0.95;
+      u.pitch = 1.0;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(u);
+    }
+    $("#speakBtn").addEventListener("click", () => {
+      const L = LETTERS[idx];
+      const variants = [L.name, L.pron.replace(/\(.*?\)/g,"")];
+      speak(`${variants[0]} — ${L.pron}`);
+    });
+
+    // --- TRACE VIEW -------------------------------------------------
+    const traceSel = $("#traceSelect");
+    traceSel.innerHTML = LETTERS.map(L => `<option value="${L.name}">${L.name}</option>`).join("");
+    $("#traceCase").addEventListener("change", highlightGhost);
+    traceSel.addEventListener("change", () => document.dispatchEvent(new CustomEvent("traceChange")));
+
+    function highlightGhost() {
+      const L = LETTERS.find(x => x.name === $("#traceSelect").value) || LETTERS[idx];
+      const isUpper = $("#traceCase").value === "upper";
+      $("#ghost").textContent = isUpper ? L.u : L.l;
+    }
+
+    // Basic drawing pad
+    const canvas = document.getElementById("pad");
+    const ctx = canvas.getContext("2d");
+    ctx.lineWidth = 18;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#e5e7eb";
+
+    let drawing = false, last = null;
+    function pos(e) {
+      const r = canvas.getBoundingClientRect();
+      const x = (e.touches? e.touches[0].clientX : e.clientX) - r.left;
+      const y = (e.touches? e.touches[0].clientY : e.clientY) - r.top;
+      const scaleX = canvas.width / r.width, scaleY = canvas.height / r.height;
+      return {x: x*scaleX, y: y*scaleY};
+    }
+    function start(e) { drawing = true; last = pos(e); }
+    function move(e) {
+      if (!drawing) return;
+      const p = pos(e);
+      ctx.beginPath();
+      ctx.moveTo(last.x, last.y);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      last = p;
+      e.preventDefault();
+    }
+    function end() { drawing = false; last = null; }
+
+    ["mousedown","touchstart"].forEach(ev => canvas.addEventListener(ev,start,{passive:false}));
+    ["mousemove","touchmove"].forEach(ev => canvas.addEventListener(ev,move,{passive:false}));
+    ["mouseup","mouseleave","touchend","touchcancel"].forEach(ev => canvas.addEventListener(ev,end,{passive:true}));
+
+    $("#erase").addEventListener("click", () => {
+      ctx.clearRect(0,0,canvas.width, canvas.height);
+    });
+    $("#savePNG").addEventListener("click", () => {
+      const a = document.createElement("a");
+      const L = LETTERS.find(x => x.name === $("#traceSelect").value);
+      const which = $("#traceCase").value === "upper" ? L.u : L.l;
+      a.download = `trace-${L.name}-${which}.png`;
+      a.href = canvas.toDataURL("image/png");
+      a.click();
+    });
+
+    // --- QUIZ -------------------------------------------------------
+    const scoreEl = $("#score"), totalEl = $("#total");
+    function incScore(right) {
+      PROG.score = PROG.score || {right:0,total:0};
+      PROG.score.total++;
+      if (right) PROG.score.right++;
+      saveProgress(PROG);
+      renderScore();
+    }
+    function renderScore() {
+      scoreEl.textContent = PROG.score?.right ?? 0;
+      totalEl.textContent = PROG.score?.total ?? 0;
+    }
+    renderScore();
+
+    function pickScope() {
+      const scope = $("#quizScope").value;
+      if (scope === "all") return LETTERS.slice();
+      if (scope === "learned") return LETTERS.filter(L => PROG.learned[L.name]);
+      if (scope === "unlearned") return LETTERS.filter(L => !PROG.learned[L.name]);
+      return LETTERS.slice();
+    }
+
+    function newQuestion() {
+      const mode = $("#quizMode").value;
+      const pool = pickScope();
+      if (pool.length < 1) { $("#qText").textContent = "No letters in this scope. Try All."; return; }
+      const answer = pool[Math.floor(Math.random() * pool.length)];
+      $("#quizOptions").innerHTML = "";
+      $("#quizFree").innerHTML = "";
+
+      if (mode === "see-name") {
+        $("#qText").innerHTML = `What is the <b>name</b> of this letter? <span class="glyph" style="font-size:72px; display:inline-block; vertical-align:middle">${Math.random()<.5?answer.u:answer.l}</span>`;
+        const options = new Set([answer.name]);
+        while (options.size < 4) options.add(LETTERS[Math.floor(Math.random()*LETTERS.length)].name);
+        [...options].sort(() => Math.random() - .5).forEach(name => {
+          const btn = document.createElement("button");
+          btn.textContent = name;
+          btn.addEventListener("click", () => {
+            const ok = name === answer.name;
+            btn.classList.add(ok? "correct":"incorrect");
+            incScore(ok);
+          });
+          $("#quizOptions").appendChild(btn);
+        });
+      } else if (mode === "hear-letter") {
+        $("#qText").textContent = "Listen and pick the letter:";
+        const say = `${answer.name} — ${answer.pron}`;
+        speak(say);
+        const choices = new Set([answer.u, answer.l]);
+        while (choices.size < 4) {
+          const r = LETTERS[Math.floor(Math.random()*LETTERS.length)];
+          choices.add(Math.random()<.5 ? r.u : r.l);
+        }
+        [...choices].sort(() => Math.random() - .5).forEach(glyph => {
+          const btn = document.createElement("button");
+          btn.innerHTML = `<span style="font-size:32px">${glyph}</span>`;
+          btn.addEventListener("click", () => {
+            const ok = glyph === answer.u || glyph === answer.l;
+            btn.classList.add(ok? "correct":"incorrect");
+            incScore(ok);
+          });
+          $("#quizOptions").appendChild(btn);
+        });
+      } else if (mode === "type-name") {
+        $("#qText").innerHTML = `Type the <b>name</b> of this letter: <span class="glyph" style="font-size:72px; display:inline-block; vertical-align:middle">${Math.random()<.5?answer.u:answer.l}</span>`;
+        const input = document.createElement("input");
+        input.type = "text";
+        input.placeholder = "e.g., alpha";
+        const btn = document.createElement("button");
+        btn.textContent = "Check";
+        btn.className = "primary";
+        const feedback = document.createElement("div");
+        feedback.className = "pron";
+        $("#quizFree").append(input, btn, feedback);
+        btn.addEventListener("click", () => {
+          const val = input.value.trim().toLowerCase();
+          const names = [answer.name, ...(answer.alt || [])].map(s => s.toLowerCase());
+          const ok = names.includes(val);
+          feedback.textContent = ok ? "Correct!" : `Incorrect. Answer: ${answer.name}`;
+          feedback.style.color = ok ? "var(--good)" : "var(--bad)";
+          incScore(ok);
+        });
+      }
+    }
+    $("#newQ").addEventListener("click", newQuestion);
+
+    // --- PROGRESS ---------------------------------------------------
+    function renderProgress() {
+      const wrap = $("#progressList");
+      wrap.innerHTML = "";
+      LETTERS.forEach(L => {
+        const learned = !!PROG.learned[L.name];
+        const div = document.createElement("div");
+        div.className = "pill" + (learned ? " learned" : "");
+        div.innerHTML = `
+          <div style="font-size:28px">${L.u}</div>
+          <div style="color:var(--muted); font-size:12px">${L.l}</div>
+          <div style="font-size:12px; margin-top:2px">${L.name}</div>
+          <div style="font-size:11px; color:${learned?'var(--good)':'var(--muted)'}">${learned?'learned ✓':'not yet'}</div>`;
+        wrap.appendChild(div);
+      });
+    }
+    $("#resetAll").addEventListener("click", () => {
+      if (!confirm("Reset all learned flags and quiz score?")) return;
+      PROG = { learned: {}, score:{right:0,total:0} };
+      saveProgress(PROG);
+      renderLearn();
+      renderScore();
+    });
+
+    // --- INIT -------------------------------------------------------
+    function renderScore(){}
+    renderLettersList();
+    renderLearn();
+    renderProgress();
+    // restore correct score rendering (reassigns after function stub above)
+    function renderScore() {
+      const scoreEl = document.getElementById("score");
+      const totalEl = document.getElementById("total");
+      scoreEl.textContent = PROG.score?.right ?? 0;
+      totalEl.textContent = PROG.score?.total ?? 0;
+    }
+    renderScore();
+  </script>
 </body>
 </html>
