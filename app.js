@@ -87,67 +87,180 @@ $("#savePNG").addEventListener("click", function(){ var a=document.createElement
 
 // Quiz
 var scoreEl=$("#score"), scoreOutOfEl=$("#scoreOutOf"), roundEl=$("#roundN"), roundTotalEl=$("#roundTotal");
+var quizResultsEl=$("#quizResults"), quizSummaryEl=$("#quizSummary"), quizWrongListEl=$("#quizWrongList"), reviewWrongBtn=$("#reviewWrong");
 var roundSize=10, qCount=0;
-function resetRound(){ qCount=0; roundSize=+$("#roundSize").value; PROG.score={right:0,total:0}; scoreOutOfEl.textContent=roundSize; roundTotalEl.textContent=roundSize; renderScore(); }
+var wrongQuestions=[], reviewQueue=[], reviewIndex=0, inReview=false;
+function resetRound(){
+  qCount=0; roundSize=+$("#roundSize").value; PROG.score={right:0,total:0};
+  scoreOutOfEl.textContent=roundSize; roundTotalEl.textContent=roundSize; renderScore();
+  wrongQuestions=[]; reviewQueue=[]; reviewIndex=0; inReview=false; hideQuizResults();
+}
 $("#roundSize").addEventListener("change", resetRound);
 function renderScore(){ scoreEl.textContent = (PROG.score && PROG.score.right) || 0; }
 function incScore(ok){ PROG.score.total++; if(ok) PROG.score.right++; renderScore(); }
 function pickScope(){ var s=$("#quizScope").value; if(s==="learned") return LETTERS.filter(function(L){return PROG.learned[L.name]}); if(s==="unlearned") return LETTERS.filter(function(L){return !PROG.learned[L.name]}); return LETTERS.slice(); }
 function newRound(){ resetRound(); $("#qText").textContent="Round started — answer the question below."; askQuestion(); }
 $("#newQ").addEventListener("click", newRound);
+reviewWrongBtn.addEventListener("click", function(){
+  if(!wrongQuestions.length) return;
+  inReview = true; reviewQueue = wrongQuestions.map(function(item){ return item.question; }); reviewIndex = 0;
+  $("#qText").textContent = "Reviewing missed questions — not scored.";
+  askQuestion();
+});
 
-function askQuestion(){
-  if(qCount>=roundSize){
-    alert('Round complete! Score: '+PROG.score.right+'/'+roundSize);
-    $("#qText").textContent = "Pick a mode and start a new round.";
-    $("#quizOptions").innerHTML = ""; $("#quizFree").innerHTML = ""; return;
+function hideQuizResults(){ quizResultsEl.hidden = true; reviewWrongBtn.hidden = true; quizWrongListEl.innerHTML = ""; quizSummaryEl.textContent = ""; }
+function showQuizResults(){
+  var wrongCount = wrongQuestions.length;
+  quizResultsEl.hidden = false;
+  var scoreLine = "Score: " + PROG.score.right + "/" + roundSize + ". ";
+  if(wrongCount){
+    quizSummaryEl.textContent = scoreLine + "You missed " + wrongCount + " question" + (wrongCount === 1 ? "" : "s") + ".";
+    quizWrongListEl.innerHTML = "";
+    wrongQuestions.forEach(function(item){
+      var li=document.createElement("li");
+      var ua = (item.userAnswer === undefined || item.userAnswer === null || item.userAnswer === "") ? "no answer" : item.userAnswer;
+      li.textContent = item.summary + " — you answered \"" + ua + "\"; correct: " + item.correctLabel;
+      quizWrongListEl.appendChild(li);
+    });
+    reviewWrongBtn.hidden = false;
+  } else {
+    quizSummaryEl.textContent = scoreLine + "Perfect round — no missed questions.";
+    quizWrongListEl.innerHTML = "";
+    reviewWrongBtn.hidden = true;
   }
-  qCount++; roundEl.textContent = qCount;
-  var mode=$("#quizMode").value; var pool=pickScope(); var answer=rand(pool); $("#quizOptions").innerHTML=""; $("#quizFree").innerHTML="";
+}
+
+function buildQuestion(mode, pool){
+  var answer = rand(pool);
   if(mode==="see-name"){
     var shown = Math.random()<.5 ? answer.u : answer.l;
-    $("#qText").innerHTML = 'What is the <b>name</b> of this letter? <span class="glyph" style="font-size:72px; display:inline-block; vertical-align:middle">'+shown+'</span>';
     var opts=new Set([answer.name]); while(opts.size<4) opts.add(rand(LETTERS).name);
-    Array.from(opts).sort(function(){return Math.random()-.5}).forEach(function(name){
-      var b=document.createElement("button"); b.textContent=name;
-      b.addEventListener("click", function(){ var ok = name===answer.name; b.classList.add(ok?'correct':'incorrect'); incScore(ok); askQuestion(); });
-      $("#quizOptions").appendChild(b);
-    });
-  } else if (mode==="hear-letter"){
-    $("#qText").textContent = "Listen and pick the letter:";
-    var shown = Math.random()<.5 ? answer.u : answer.l; speak(answer.name+' — '+answer.pron);
-    var choices = new Set([shown]); while(choices.size<4){ var r=rand(pool); choices.add(Math.random()<.5?r.u:r.l); }
-    Array.from(choices).sort(function(){return Math.random()-.5}).forEach(function(g){
-      var b=document.createElement("button"); b.innerHTML = '<span style="font-size:32px">'+g+'</span>';
-      b.addEventListener("click", function(){ var ok = g===shown; b.classList.add(ok?'correct':'incorrect'); incScore(ok); askQuestion(); });
-      $("#quizOptions").appendChild(b);
-    });
-  } else if (mode==="type-name"){
-    var shown = Math.random()<.5 ? answer.u : answer.l;
-    $("#qText").innerHTML = 'Type the <b>name</b> of this letter: <span class="glyph" style="font-size:72px; display:inline-block; vertical-align:middle">'+shown+'</span>';
-    var input=document.createElement("input"); input.type="text"; input.placeholder="e.g., alpha";
-    var btn=document.createElement("button"); btn.textContent="Check"; btn.className="primary";
-    var fb=document.createElement("div"); fb.className="pron";
-    $("#quizFree").appendChild(input); $("#quizFree").appendChild(btn); $("#quizFree").appendChild(fb);
-    btn.addEventListener("click", function(){ var val=(input.value||'').trim().toLowerCase(); var names=[answer.name].concat(answer.alt||[]).map(function(s){return s.toLowerCase()}); var ok = names.indexOf(val)>=0; fb.textContent = ok? 'Correct!' : ('Incorrect. Answer: '+answer.name); fb.style.color = ok? 'var(--good)' : 'var(--bad)'; incScore(ok); askQuestion(); });
-  } else if (mode==="state-capital"){
+    return {
+      mode: mode,
+      promptHtml: 'What is the <b>name</b> of this letter? <span class="glyph" style="font-size:72px; display:inline-block; vertical-align:middle">'+shown+'</span>',
+      options: Array.from(opts).sort(function(){return Math.random()-.5}).map(function(name){ return {label:name, value:name}; }),
+      correctValue: answer.name,
+      correctLabel: answer.name,
+      summary: 'Name for letter '+shown
+    };
+  }
+  if(mode==="hear-letter"){
+    var shownLetter = Math.random()<.5 ? answer.u : answer.l;
+    var choices = new Set([shownLetter]); while(choices.size<4){ var r=rand(pool); choices.add(Math.random()<.5?r.u:r.l); }
+    return {
+      mode: mode,
+      promptText: "Listen and pick the letter:",
+      speakText: answer.name+' — '+answer.pron,
+      options: Array.from(choices).sort(function(){return Math.random()-.5}).map(function(g){ return {label:'<span style="font-size:32px">'+g+'</span>', value:g}; }),
+      correctValue: shownLetter,
+      correctLabel: shownLetter + " (" + answer.name + ")",
+      summary: 'Letter for spoken "'+answer.name+'"'
+    };
+  }
+  if(mode==="type-name"){
+    var shownGlyph = Math.random()<.5 ? answer.u : answer.l;
+    return {
+      mode: mode,
+      promptHtml: 'Type the <b>name</b> of this letter: <span class="glyph" style="font-size:72px; display:inline-block; vertical-align:middle">'+shownGlyph+'</span>',
+      freeInput: true,
+      correctValues: [answer.name].concat(answer.alt||[]).map(function(s){ return s.toLowerCase(); }),
+      correctLabel: answer.name,
+      summary: 'Name for letter '+shownGlyph
+    };
+  }
+  if(mode==="state-capital"){
     var validGreek = Object.keys(GREEK_TO_LATIN);
     var pool2 = LETTERS.filter(function(L){ return validGreek.indexOf(L.name)>=0; });
     var g = rand(pool2);
     var mapped = GREEK_TO_LATIN[g.name];
     var pairs = CAPITALS_BY_INITIAL[mapped];
     var correct = rand(pairs);
-    var shown = Math.random()<.5 ? g.u : g.l;
-    $("#qText").innerHTML = 'Pick the <b>U.S. state</b> whose <i>capital</i> starts with: <b>'+mapped+'</b> (closest English initial to Greek) ' +
-      '<span class="glyph" style="font-size:72px; display:inline-block; vertical-align:middle">'+shown+'</span>';
+    var shownCap = Math.random()<.5 ? g.u : g.l;
     var choices = new Set([correct[0]]);
     while(choices.size<4){ var other = rand(STATES.filter(function(p){return p[0]!==correct[0]})); choices.add(other[0]); }
-    Array.from(choices).sort(function(){return Math.random()-.5}).forEach(function(stateName){
-      var b=document.createElement("button"); b.textContent = stateName;
-      b.addEventListener("click", function(){ var ok = stateName===correct[0]; b.classList.add(ok?'correct':'incorrect'); $("#qText").innerHTML = 'Correct answer: '+correct[0]+' (capital '+correct[1]+').'; incScore(ok); askQuestion(); });
+    return {
+      mode: mode,
+      promptHtml: 'Pick the <b>U.S. state</b> whose <i>capital</i> starts with: <b>'+mapped+'</b> (closest English initial to Greek) ' +
+        '<span class="glyph" style="font-size:72px; display:inline-block; vertical-align:middle">'+shownCap+'</span>',
+      options: Array.from(choices).sort(function(){return Math.random()-.5}).map(function(stateName){ return {label:stateName, value:stateName}; }),
+      correctValue: correct[0],
+      correctLabel: correct[0]+' (capital '+correct[1]+')',
+      summary: 'State for capital initial "'+mapped+'" ('+shownCap+')'
+    };
+  }
+  return null;
+}
+
+function askQuestion(){
+  if(inReview){
+    if(reviewIndex >= reviewQueue.length){
+      inReview = false;
+      $("#qText").textContent = "Review complete. Start a new round when you're ready.";
+      $("#quizOptions").innerHTML = ""; $("#quizFree").innerHTML = "";
+      showQuizResults();
+      return;
+    }
+    renderQuestion(reviewQueue[reviewIndex], true);
+    return;
+  }
+  if(qCount>=roundSize){
+    $("#qText").textContent = "Round complete.";
+    $("#quizOptions").innerHTML = ""; $("#quizFree").innerHTML = "";
+    showQuizResults();
+    return;
+  }
+  qCount++; roundEl.textContent = qCount;
+  var mode=$("#quizMode").value; var pool=pickScope();
+  var q = buildQuestion(mode, pool);
+  renderQuestion(q, false);
+}
+
+function renderQuestion(q, reviewing){
+  hideQuizResults();
+  $("#quizOptions").innerHTML=""; $("#quizFree").innerHTML="";
+  if(q.promptHtml){ $("#qText").innerHTML = q.promptHtml; } else { $("#qText").textContent = q.promptText || ""; }
+  if(q.speakText){ speak(q.speakText); }
+  if(q.options && q.options.length){
+    q.options.forEach(function(opt){
+      var b=document.createElement("button"); b.innerHTML = opt.label;
+      b.addEventListener("click", function(){
+        var ok = opt.value === q.correctValue;
+        b.classList.add(ok?'correct':'incorrect');
+        handleAnswer(q, opt.value, ok, reviewing);
+      });
       $("#quizOptions").appendChild(b);
     });
+  } else if(q.freeInput){
+    var input=document.createElement("input"); input.type="text"; input.placeholder="e.g., alpha";
+    var btn=document.createElement("button"); btn.textContent="Check"; btn.className="primary";
+    var fb=document.createElement("div"); fb.className="pron";
+    $("#quizFree").appendChild(input); $("#quizFree").appendChild(btn); $("#quizFree").appendChild(fb);
+    function check(){
+      var val=(input.value||'').trim().toLowerCase();
+      var ok = q.correctValues.indexOf(val)>=0;
+      fb.textContent = ok? 'Correct!' : ('Incorrect. Answer: '+q.correctLabel);
+      fb.style.color = ok? 'var(--good)' : 'var(--bad)';
+      handleAnswer(q, val, ok, reviewing, true);
+    }
+    btn.addEventListener("click", check);
+    input.addEventListener("keydown", function(e){ if(e.key==="Enter") check(); });
+    input.focus();
   }
+}
+
+function handleAnswer(q, userValue, ok, reviewing, fromFreeInput){
+  if(!reviewing){
+    incScore(ok);
+    if(!ok){
+      wrongQuestions.push({question:q, userAnswer:userValue, correctLabel:q.correctLabel, summary:q.summary});
+    }
+  }
+  var next = function(){
+    if(reviewing){ reviewIndex++; }
+    askQuestion();
+  };
+  if(fromFreeInput){ setTimeout(next, 500); }
+  else { setTimeout(next, 150); }
 }
 
 // Progress
