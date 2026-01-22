@@ -9,7 +9,21 @@ const STORAGE_KEY="greek_trainer_progress_v5";
 function $(s){return document.querySelector(s)}
 function $$(s){return Array.prototype.slice.call(document.querySelectorAll(s))}
 function rand(a){return a[Math.floor(Math.random()*a.length)]}
-function loadProgress(){try{var r=localStorage.getItem(STORAGE_KEY);return r?JSON.parse(r):{learned:{},score:{right:0,total:0}}}catch(e){return {learned:{},score:{right:0,total:0}}}}
+function loadProgress(){
+  try{
+    var r=localStorage.getItem(STORAGE_KEY);
+    var p=r?JSON.parse(r):null;
+    if(!p) p={learned:{},score:{right:0,total:0},jumble:{solved:0,bestGoalStreak:0}};
+    if(!p.learned) p.learned={};
+    if(!p.score) p.score={right:0,total:0};
+    if(!p.jumble) p.jumble={solved:0,bestGoalStreak:0};
+    if(typeof p.jumble.solved!=="number") p.jumble.solved=0;
+    if(typeof p.jumble.bestGoalStreak!=="number") p.jumble.bestGoalStreak=0;
+    return p;
+  }catch(e){
+    return {learned:{},score:{right:0,total:0},jumble:{solved:0,bestGoalStreak:0}};
+  }
+}
 function saveProgress(p){localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); renderProgress(); renderLettersList(); }
 var PROG = loadProgress();
 
@@ -18,7 +32,7 @@ $$(".tab-btn").forEach(function(btn){
     $$(".tab-btn").forEach(function(b){b.classList.remove("active")});
     btn.classList.add("active");
     var tab = btn.getAttribute("data-tab");
-    ["learn","trace","quiz","progress","blocks"].forEach(function(id){
+    ["learn","trace","quiz","progress","jumble"].forEach(function(id){
       document.getElementById(id).hidden = id !== tab;
     });
   });
@@ -265,47 +279,96 @@ function handleAnswer(q, userValue, ok, reviewing, fromFreeInput){
 
 // Progress
 function renderProgress(){ var wrap=$("#progressList"); wrap.innerHTML=""; LETTERS.forEach(function(L){ var learned=!!PROG.learned[L.name]; var d=document.createElement("div"); d.className="pill"+(learned?' learned':''); d.innerHTML='<span class="upper">'+L.u+'</span><span class="lower">'+L.l+'</span><div style="font-size:12px">'+L.name+'</div>'; wrap.appendChild(d); }); }
-$("#resetAll").addEventListener("click", function(){ if(!confirm("Reset all learned flags and current round score?")) return; PROG={learned:{},score:{right:0,total:0}}; saveProgress(PROG); renderLearn(); renderScore(); });
+$("#resetAll").addEventListener("click", function(){
+  if(!confirm("Reset all learned flags and current round score?")) return;
+  PROG={learned:{},score:{right:0,total:0},jumble:{solved:0,bestGoalStreak:0}};
+  jumbleGoalStreak = 0;
+  saveProgress(PROG);
+  renderLearn(); renderScore(); updateJumbleStats();
+});
 
-// Blocks
-var BLOCKS = document.getElementById("blocks");
+// Jumble
+var JUMBLE_AREA = document.getElementById("jumbleArea");
 var TARGET_LATIN = document.getElementById("targetLatin");
 var BLOCKS_FEED = document.getElementById("blocksFeedback");
-function newBlocks(){
+var JUMBLE_GOAL = document.getElementById("jumbleGoal");
+var JUMBLE_MOVES = document.getElementById("jumbleMoves");
+var JUMBLE_SOLVED = document.getElementById("jumbleSolved");
+var JUMBLE_STREAK = document.getElementById("jumbleStreak");
+var JUMBLE_BEST = document.getElementById("jumbleBest");
+var jumbleMoves=0;
+var jumbleGoalMoves=0;
+var jumbleGoalStreak=0;
+var jumbleSolvedThisRound=false;
+function updateJumbleStats(){
+  if(!PROG.jumble) PROG.jumble={solved:0,bestGoalStreak:0};
+  JUMBLE_GOAL.textContent = jumbleGoalMoves;
+  JUMBLE_MOVES.textContent = jumbleMoves;
+  JUMBLE_SOLVED.textContent = PROG.jumble.solved;
+  JUMBLE_STREAK.textContent = jumbleGoalStreak;
+  JUMBLE_BEST.textContent = PROG.jumble.bestGoalStreak;
+}
+function newJumble(){
   var item = rand(BLOCKS_DATA);
   TARGET_LATIN.textContent = item.latin;
+  jumbleMoves = 0;
+  jumbleGoalMoves = Math.max(4, item.greek.length + 1);
+  jumbleSolvedThisRound = false;
   BLOCKS_FEED.textContent = "Drag letters to match the Greek spelling order.";
-  BLOCKS.innerHTML = "";
+  BLOCKS_FEED.style.color = "var(--muted)";
+  JUMBLE_AREA.innerHTML = "";
   var seq = item.greek.map(function(n){ return LETTERS.find(function(L){return L.name===n}); });
   var shuffled = seq.slice().sort(function(){return Math.random()-.5});
   shuffled.forEach(function(L){
     var el=document.createElement("div"); el.className="block"; el.draggable=true; el.textContent = (Math.random()<.5?L.u:L.l); el.dataset.name=L.name;
     el.addEventListener("dragstart", function(e){ e.dataTransfer.setData("text/plain", L.name); e.dataTransfer.effectAllowed="move"; el.classList.add("dragging"); });
     el.addEventListener("dragend", function(){ el.classList.remove("dragging"); });
-    BLOCKS.appendChild(el);
+    JUMBLE_AREA.appendChild(el);
   });
+  updateJumbleStats();
 }
-document.getElementById("newBlocks").addEventListener("click", newBlocks);
-BLOCKS.addEventListener("dragover", function(e){
+document.getElementById("newJumble").addEventListener("click", newJumble);
+JUMBLE_AREA.addEventListener("dragover", function(e){
   e.preventDefault();
   var dragging = document.querySelector(".block.dragging");
-  var others = Array.prototype.slice.call(BLOCKS.querySelectorAll(".block:not(.dragging)"));
+  var others = Array.prototype.slice.call(JUMBLE_AREA.querySelectorAll(".block:not(.dragging)"));
   var placed=false;
-  for(var i=0;i<others.length;i++){ var el=others[i]; var r=el.getBoundingClientRect(); if(e.clientX < r.left + r.width/2){ BLOCKS.insertBefore(dragging, el); placed=true; break; } }
-  if(!placed && dragging) BLOCKS.appendChild(dragging);
+  for(var i=0;i<others.length;i++){ var el=others[i]; var r=el.getBoundingClientRect(); if(e.clientX < r.left + r.width/2){ JUMBLE_AREA.insertBefore(dragging, el); placed=true; break; } }
+  if(!placed && dragging) JUMBLE_AREA.appendChild(dragging);
 });
-BLOCKS.addEventListener("drop", function(e){
+JUMBLE_AREA.addEventListener("drop", function(e){
   e.preventDefault();
-  var names = Array.prototype.slice.call(BLOCKS.querySelectorAll(".block")).map(function(b){return b.dataset.name});
+  if(jumbleSolvedThisRound) return;
+  jumbleMoves++;
+  var names = Array.prototype.slice.call(JUMBLE_AREA.querySelectorAll(".block")).map(function(b){return b.dataset.name});
   var item = BLOCKS_DATA.find(function(x){ return x.latin===TARGET_LATIN.textContent; });
-  var ok = JSON.stringify(names) === JSON.stringify(item.greek);
-  BLOCKS_FEED.textContent = ok ? "✅ Nice! That's the correct Greek sequence." : "❌ Not quite — keep rearranging.";
-  BLOCKS_FEED.style.color = ok ? "var(--good)" : "var(--bad)";
+  var correctCount = 0;
+  for(var i=0;i<names.length;i++){ if(names[i]===item.greek[i]) correctCount++; }
+  var ok = correctCount === item.greek.length;
+  if(ok){
+    jumbleSolvedThisRound = true;
+    PROG.jumble.solved++;
+    if(jumbleMoves <= jumbleGoalMoves){
+      jumbleGoalStreak++;
+      PROG.jumble.bestGoalStreak = Math.max(PROG.jumble.bestGoalStreak, jumbleGoalStreak);
+      BLOCKS_FEED.textContent = "✅ Solved in " + jumbleMoves + " moves — goal met!";
+    } else {
+      jumbleGoalStreak = 0;
+      BLOCKS_FEED.textContent = "✅ Solved in " + jumbleMoves + " moves — try for ≤ " + jumbleGoalMoves + " next time.";
+    }
+    BLOCKS_FEED.style.color = "var(--good)";
+    Array.prototype.slice.call(JUMBLE_AREA.querySelectorAll(".block")).forEach(function(b){ b.draggable=false; b.classList.add("solved"); });
+    saveProgress(PROG);
+  } else {
+    BLOCKS_FEED.textContent = "Order matches " + correctCount + "/" + item.greek.length + " letters. Keep going.";
+    BLOCKS_FEED.style.color = "var(--muted)";
+  }
+  updateJumbleStats();
 });
 
 // Init
 function init(){
   document.getElementById("traceSelect").innerHTML = LETTERS.map(function(L){return '<option value="'+L.name+'">'+L.name+'</option>'; }).join('');
-  renderLettersList(); renderLearn(); renderProgress(); resetRound(); newBlocks();
+  renderLettersList(); renderLearn(); renderProgress(); resetRound(); newJumble();
 }
 init();

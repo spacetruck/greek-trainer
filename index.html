@@ -11,7 +11,8 @@
       addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js'));
     }
   </script>
-  <link rel="preload" href="app.js" as="script">
+  <!-- Cache-busting: update the hash in these filenames on each release and keep service-worker.js in sync. -->
+  <link rel="preload" href="app.6f2c3a1.js" as="script">
   <style>
     :root { --bg:#0f172a; --text:#e5e7eb; --muted:#9ca3af; --accent:#38bdf8; --good:#22c55e; --bad:#ef4444; --warn:#f59e0b; }
     *{ box-sizing:border-box; }
@@ -65,8 +66,9 @@
     .quiz-wrong li{ margin:4px 0; }
     .stat{ font-variant-numeric:tabular-nums; background:#0b1220; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:8px 10px; }
 
-    #blocks { display:flex; gap:10px; flex-wrap:wrap; min-height:60px; padding:10px; border:1px dashed rgba(255,255,255,.15); border-radius:12px; background:#0b1220; }
+    #jumbleArea { display:flex; gap:10px; flex-wrap:wrap; min-height:60px; padding:10px; border:1px dashed rgba(255,255,255,.15); border-radius:12px; background:#0b1220; }
     .block { padding:14px 18px; background:#111b34; border:1px solid rgba(255,255,255,.12); border-radius:12px; cursor:grab; font-size:28px; user-select:none; }
+    .block.solved { cursor:default; opacity:.7; }
     .target { padding:10px; color:var(--muted); }
 
     footer{ text-align:center; color:var(--muted); padding:30px 10px; font-size:12px; }
@@ -81,7 +83,7 @@
       <button class="tab-btn" data-tab="trace">Trace</button>
       <button class="tab-btn" data-tab="quiz">Quiz</button>
       <button class="tab-btn" data-tab="progress">Progress</button>
-      <button class="tab-btn" data-tab="blocks">Blocks Game</button>
+      <button class="tab-btn" data-tab="jumble">Jumble</button>
     </nav>
   </header>
 
@@ -193,19 +195,24 @@
       </div>
     </section>
 
-    <section id="blocks" class="panel" hidden>
+    <section id="jumble" class="panel" hidden>
       <div class="row controls">
         <span class="target">Form this word/prefix: <b><span id="targetLatin">meta</span></b></span>
+        <span class="stat">Goal: ≤ <span id="jumbleGoal">0</span> moves</span>
+        <span class="stat">Moves: <span id="jumbleMoves">0</span></span>
+        <span class="stat">Solved: <span id="jumbleSolved">0</span></span>
+        <span class="stat">Goal streak: <span id="jumbleStreak">0</span> (best <span id="jumbleBest">0</span>)</span>
         <div class="spacer"></div>
-        <button id="newBlocks" class="primary">New Puzzle</button>
+        <button id="newJumble" class="primary">New Puzzle</button>
       </div>
-      <div id="blocks" aria-label="draggable blocks area"></div>
+      <div id="jumbleArea" aria-label="draggable blocks area"></div>
       <div id="blocksFeedback" class="pron" style="margin-top:8px;"></div>
     </section>
   </main>
 
   <footer>Built for learning the Greek alphabet with US‑style math pronunciations. Install via “Add to Home Screen”.</footer>
 
-  <script src="app.js"></script>
+  <!-- Cache-busting: this filename must match the hashed asset above and service-worker.js. -->
+  <script src="app.6f2c3a1.js"></script>
 </body>
 </html>
